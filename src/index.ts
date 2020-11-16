@@ -1,5 +1,7 @@
 import SwaggerClient from 'swagger-client';
 import type { default as apid } from './api-types';
+import * as testkeys from './testkeys';
+import aws4 from 'aws4';
 
 /* @ts-ignore */ // ignore the next line so that the code that builds the import file can be compiled
 const spec = (await import('./sp-api-swagger.json')).default;
@@ -47,26 +49,175 @@ type getAuthorizationCodeParams = {
     mwsAuthToken: string,
 };
 
-export default class SpApi {
-    swaggerClient: typeof SwaggerClient;
-    isReady = false;
+const OAUTH_URL = 'https://api.amazon.com/auth/o2/token';
 
-    constructor({ region }: { region: ApiRegion } = { region: ApiRegion.NorthAmerica }) {
-        const { endpoint } = RegionServers[region];
+export class LWA {
+    private access_token: string;
+    private refresh_token: string;
+    private expires_at: number;
+    private clientId: string;
+    private clientSecret: string;
+
+    private constructor({ access_token, refresh_token, expires_at }: LWATokens, clientId: string = testkeys.LWA_CLIENT_ID, clientSecret: string = testkeys.LWA_CLIENT_SECRET) {
+        this.access_token = access_token;
+        this.refresh_token = refresh_token;
+        this.expires_at = expires_at;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+    }
+    static async fromOauthCode(code: string, clientId: string = testkeys.LWA_CLIENT_ID, clientSecret: string = testkeys.LWA_CLIENT_SECRET) {
+        const params = {
+            grant_type: 'authorization_code',
+            code,
+            client_id: clientId,
+            client_secret: clientSecret,
+        }
+        const request = {
+            url: OAUTH_URL,
+            method: 'POST',
+/*             body: `grant_type=refresh_token
+&refresh_token=${token}
+&client_id=${clientId}
+&client_secret=${clientSecret}`,
+ */
+            body: Object.keys(params).map((key: any) => {
+                return encodeURIComponent(key)+'='+encodeURIComponent((params as any)[key]);
+            }).join('&'),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }
+        };
+        const res = await SwaggerClient.http(request);
+        const t: LWATokens = {
+            access_token: res.body.access_token,
+            refresh_token: res.body.refresh_token,
+            expires_at: Date.now() + res.body.expires_in - 600,
+        };
+        return new LWA(t, clientId, clientSecret);
+    }
+    static async fromRefreshToken(refreshToken: string, clientId: string = testkeys.LWA_CLIENT_ID, clientSecret: string = testkeys.LWA_CLIENT_SECRET) {
+        const params = {
+            grant_type: 'refresh_token',
+            refresh_token: refreshToken,
+            client_id: clientId,
+            client_secret: clientSecret,
+        };
+        const request = {
+            url: OAUTH_URL,
+            method: 'POST',
+            body: Object.keys(params).map((key: any) => {
+                return encodeURIComponent(key) + '=' + encodeURIComponent((params as any)[key]);
+            }).join('&'),
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }
+        };
+        const res = await SwaggerClient.http(request);
+        const t: LWATokens = {
+            access_token: res.body.access_token,
+            refresh_token: res.body.refresh_token,
+            expires_at: Date.now() + res.body.expires_in - 600,
+        };
+        return new LWA(t, clientId, clientSecret);
+    }
+    async refreshAccessToken() {
+        const newTokens = await LWA.fromRefreshToken(this.refresh_token, this.clientId, this.clientSecret);
+        Object.assign(this, newTokens);
+        return this;
+    }
+    async getAccessToken() {
+        if (this.access_token === '') {
+            return null;
+        }
+        if (this.refresh_token === '') {
+            return null;
+        }
+        if (this.expires_at < Date.now()) {
+            await this.refreshAccessToken();
+        }
+        return this.access_token;
+    }
+}
+type LWATokens = {
+    access_token: string,
+    refresh_token: string,
+    expires_at: number,
+};
+// get spapi_oauth_code from client app, use getLoginRefreshToken to get the refresh_token, save
+// the refresh_token to the user account, then load that refresh_token and use it to getLoginAccessToken()
+// whenever necessary.  Note that when you do exchange the spapi_oauth_code, you get an initial access_token
+// along with your refresh token, so you possibly don't have to call getLoginAccessToken() immediately?
+
+type ConstructorParams = {
+    region?: ApiRegion,
+    clientId: string,
+    clientSecret: string,
+    oauthCode?: string,
+    refreshToken?: string,
+};
+
+export default class SpApi {
+    private swaggerClient: typeof SwaggerClient;
+    private isReady = false;
+    private lwaPromise: Promise<LWA>;
+    private lwa: LWA | null = null;
+    private region: ApiRegion;
+    private clientId: string;
+    private clientSecret: string;
+
+    constructor({ region, clientId, clientSecret, oauthCode, refreshToken }: ConstructorParams) {
+        this.region = region ?? ApiRegion.NorthAmerica;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+        console.warn('**** this.region=', this.region);
+        if (oauthCode && refreshToken) {
+            throw new Error('cannot provide both oauthCode and refreshToken');
+        }
+        if (!oauthCode && !refreshToken) {
+            throw new Error('must provide one of oauthCode or refreshToken');
+        }
+        if (oauthCode) {
+            this.lwaPromise = LWA.fromOauthCode(oauthCode, clientId, clientSecret);
+        } else {
+            this.lwaPromise = LWA.fromRefreshToken(refreshToken as string, clientId, clientSecret);
+        }
+        const { endpoint } = RegionServers[this.region];
         const thisSpec = { ...spec };
         thisSpec.host = endpoint;
         this.init(thisSpec);
+        this.requestInterceptor = this.requestInterceptor.bind(this);
     }
     private async init(spec: any) {
-        console.warn('* init spec host=', spec.host);
-        this.swaggerClient = await (new SwaggerClient({ spec }));
+        [ this.swaggerClient, this.lwa ] = await Promise.all([ new SwaggerClient({ spec, requestInterceptor: this.requestInterceptor }), this.lwaPromise ]);
         this.isReady = true;
     }
+    requestInterceptor = async (req: any) => { // req is a Request, but what the hell kind of Request? headers.append isn't there, and default Request headers is readonly.
+        // https://gist.github.com/davidkelley/c1274cffdc0d9d782d7e
+        function amzLongDate(date: Date) {
+            return date.toISOString().replace(/[:\-]|\.\d{3}/g, '').substr(0, 17);
+        }
+        const requestDate = new Date();
+        req.headers = {
+            host: RegionServers[this.region].endpoint,
+            'x-amz-access-token': (await this.lwa!.getAccessToken()) as string,
+            'x-amz-date': amzLongDate(requestDate),
+            'user-agent': 'sp-api-simple/0.1 (Language=JavaScript; Platform=Node)',
+        }
+        console.warn('**** requestInterceptor', req);
+        // const signedReq = aws4.sign({ ...req, service: 'execute-api' }, { secretAccessKey: this.clientSecret, accessKeyId: 'AKIAQJSLQX2LEXYO3CZC' });
+        // console.warn('**** sign result', signedReq);
+        // return signedReq;
+        return req;
+    }
     private ready() {
+        let readyInterval: any; // Timeout not working, don't feel like digging up how to fix right now
         return new Promise((resolve, reject) => {
             if (this.isReady) resolve(true);
-            setTimeout(() => {
-                if (this.isReady) resolve(true);
+            readyInterval = setInterval(() => {
+                if (this.isReady) {
+                    clearInterval(readyInterval);
+                    resolve(true);
+                }
             }, 10);
         });
     }
@@ -76,8 +227,17 @@ export default class SpApi {
     }
 }
 
-const test = new SpApi({ region: ApiRegion.NorthAmericaSandbox });
-const x = await test.getAuthorizationCode({developerId: '1',mwsAuthToken: '1',sellingPartnerId:'1'})
+const test = new SpApi({
+    clientId: testkeys.LWA_CLIENT_ID,
+    clientSecret: testkeys.LWA_CLIENT_SECRET,
+    refreshToken: testkeys.TEST_REFRESH_TOKEN,
+});
+console.warn('* SpApi created');
+const x = await test.getAuthorizationCode({ developerId: '1', mwsAuthToken: '1', sellingPartnerId: '1' });
+console.warn('* x=', x);
+
+// const test = new SpApi({ region: ApiRegion.NorthAmericaSandbox });
+// const x = await test.getAuthorizationCode({developerId: '1',mwsAuthToken: '1',sellingPartnerId:'1'})
 /* const { apis: {
     authorization,
     catalog,
