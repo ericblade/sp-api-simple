@@ -1,7 +1,17 @@
 import SwaggerClient from 'swagger-client';
 import type { default as apid } from './api-types';
-import * as testkeys from './testkeys';
+import { TEST_REFRESH_TOKEN, LWA_CLIENT_ID, LWA_CLIENT_SECRET, AWS_ACCESS_KEY, AWS_SECRET } from './testkeys.js';
 import aws4 from 'aws4';
+import https from 'https';
+import sleep from 'await-sleep';
+
+const testkeys = {
+    TEST_REFRESH_TOKEN,
+    LWA_CLIENT_ID,
+    LWA_CLIENT_SECRET,
+    AWS_ACCESS_KEY,
+    AWS_SECRET,
+};
 
 /* @ts-ignore */ // ignore the next line so that the code that builds the import file can be compiled
 const spec = (await import('./sp-api-swagger.json')).default;
@@ -154,6 +164,8 @@ type ConstructorParams = {
     clientSecret: string,
     oauthCode?: string,
     refreshToken?: string,
+    awsAccessKey: string,
+    awsSecret: string,
 };
 
 export default class SpApi {
@@ -162,13 +174,18 @@ export default class SpApi {
     private lwaPromise: Promise<LWA>;
     private lwa: LWA | null = null;
     private region: ApiRegion;
-    private clientId: string;
+    private lwaClientId: string;
     private clientSecret: string;
+    private awsAccessKey: string;
+    private awsSecret: string;
 
-    constructor({ region, clientId, clientSecret, oauthCode, refreshToken }: ConstructorParams) {
+    constructor({ region, clientId, clientSecret, oauthCode, refreshToken, awsAccessKey, awsSecret }: ConstructorParams) {
         this.region = region ?? ApiRegion.NorthAmerica;
-        this.clientId = clientId;
+        this.lwaClientId = clientId;
         this.clientSecret = clientSecret;
+        this.awsAccessKey = awsAccessKey;
+        this.awsSecret = awsSecret;
+
         console.warn('**** this.region=', this.region);
         if (oauthCode && refreshToken) {
             throw new Error('cannot provide both oauthCode and refreshToken');
@@ -197,17 +214,55 @@ export default class SpApi {
             return date.toISOString().replace(/[:\-]|\.\d{3}/g, '').substr(0, 17);
         }
         const requestDate = new Date();
-        req.headers = {
-            host: RegionServers[this.region].endpoint,
+        const u = new URL(req.url);
+        const opts = {
+            service: 'execute-api',
+            host: u.hostname,
+            path: `${u.pathname}${u.searchParams?'?':''}${u.searchParams}`,
+            headers: {
+                'x-amz-access-token': (await this.lwa!.getAccessToken()) as string,
+                'user-agent': 'sp-api-simple/0.1 (Language=JavaScript; Platform=Node)',
+            },
+        };
+
+        const signedOpts = aws4.sign(opts, { secretAccessKey: this.awsSecret, accessKeyId: this.awsAccessKey });
+        // console.warn('* signedOpts=', signedOpts);
+        // https.request(signedOpts, res => res.pipe(process.stdout)).end();
+        return { ...req, ...signedOpts };
+
+/*         let opts = {
+            service: 'execute-api',
+            host: 'sellingpartnerapi-na.amazon.com',
+            path: '/authorization/v1/authorizationCode?sellingPartnerId=1&developerId=1&mwsAuthToken=1',
+            headers: {
+                'x-amz-access-token': (await this.lwa!.getAccessToken()) as string,
+                'user-agent': 'sp-api-simple/0.1 (Language=JavaScript; Platform=Node)',
+            },
+        };
+
+        aws4.sign(opts, { secretAccessKey: this.awsSecret, accessKeyId: this.awsAccessKey });
+
+        https.request(opts, res => res.pipe(process.stdout)).end()
+ */
+        // await sleep(500000);
+        return req;
+        // console.warn('* ret=', {...req, ...signedOpts});
+        // return { ...req, ...signedOpts };
+/*         req.headers = {
             'x-amz-access-token': (await this.lwa!.getAccessToken()) as string,
             'x-amz-date': amzLongDate(requestDate),
             'user-agent': 'sp-api-simple/0.1 (Language=JavaScript; Platform=Node)',
         }
         console.warn('**** requestInterceptor', req);
-        // const signedReq = aws4.sign({ ...req, service: 'execute-api' }, { secretAccessKey: this.clientSecret, accessKeyId: 'AKIAQJSLQX2LEXYO3CZC' });
-        // console.warn('**** sign result', signedReq);
-        // return signedReq;
-        return req;
+        const signedReq = aws4.sign({
+            ...req,
+            service: 'execute-api',
+            host: u.hostname,
+            path: u.pathname,
+        }, { secretAccessKey: this.clientSecret, accessKeyId: 'AKIAQJSLQX2LEXYO3CZC' });
+        console.warn('**** sign result', signedReq);
+        return signedReq;
+ */        // return req;
     }
     private ready() {
         let readyInterval: any; // Timeout not working, don't feel like digging up how to fix right now
@@ -228,9 +283,12 @@ export default class SpApi {
 }
 
 const test = new SpApi({
+    region: ApiRegion.NorthAmerica,
     clientId: testkeys.LWA_CLIENT_ID,
     clientSecret: testkeys.LWA_CLIENT_SECRET,
     refreshToken: testkeys.TEST_REFRESH_TOKEN,
+    awsAccessKey: testkeys.AWS_ACCESS_KEY,
+    awsSecret: testkeys.AWS_SECRET,
 });
 console.warn('* SpApi created');
 const x = await test.getAuthorizationCode({ developerId: '1', mwsAuthToken: '1', sellingPartnerId: '1' });
