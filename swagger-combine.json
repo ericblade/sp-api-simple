@@ -34,6 +34,7 @@
         { "url": "https://raw.githubusercontent.com/amzn/selling-partner-api-models/main/models/product-pricing-api-model/productPricingV0.json" },
         { "url": "https://raw.githubusercontent.com/amzn/selling-partner-api-models/main/models/reports-api-model/reports_2020-09-04.json" },
         { "url": "https://raw.githubusercontent.com/amzn/selling-partner-api-models/main/models/sales-api-model/sales.json" },
+        { "url": "https://raw.githubusercontent.com/amzn/selling-partner-api-models/main/models/sellers-api-model/sellers.json" },
         { "url": "https://raw.githubusercontent.com/amzn/selling-partner-api-models/main/models/services-api-model/services.json" },
         {
             "url": "https://raw.githubusercontent.com/amzn/selling-partner-api-models/main/models/shipping-api-model/shipping.json",

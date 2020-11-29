@@ -2,7 +2,7 @@ import SwaggerClient from 'swagger-client';
 import type { default as apid } from './api-types';
 import { TEST_REFRESH_TOKEN, LWA_CLIENT_ID, LWA_CLIENT_SECRET, AWS_ACCESS_KEY, AWS_SECRET, AWS_ROLE_ARN } from './testkeys.js';
 import aws4 from 'aws4';
-import { signRoleCredentialsRequest, request } from './sts.js';
+import { STS } from './sts.js';
 import sleep from 'await-sleep';
 
 const testkeys = {
@@ -85,11 +85,6 @@ export class LWA {
         const request = {
             url: OAUTH_URL,
             method: 'POST',
-/*             body: `grant_type=refresh_token
-&refresh_token=${token}
-&client_id=${clientId}
-&client_secret=${clientSecret}`,
- */
             body: Object.keys(params).map((key: any) => {
                 return encodeURIComponent(key)+'='+encodeURIComponent((params as any)[key]);
             }).join('&'),
@@ -166,6 +161,7 @@ type ConstructorParams = {
     refreshToken?: string,
     awsAccessKey: string,
     awsSecret: string,
+    appRoleArn: string,
 };
 
 export default class SpApi {
@@ -173,18 +169,22 @@ export default class SpApi {
     private isReady = false;
     private lwaPromise: Promise<LWA>;
     private lwa: LWA | null = null;
+    private sts: STS;
     private region: ApiRegion;
     private lwaClientId: string;
     private clientSecret: string;
     private awsAccessKey: string;
     private awsSecret: string;
+    private appRoleArn: string;
 
-    constructor({ region, clientId, clientSecret, oauthCode, refreshToken, awsAccessKey, awsSecret }: ConstructorParams) {
+    constructor({ region, clientId, clientSecret, oauthCode, refreshToken, awsAccessKey, awsSecret, appRoleArn }: ConstructorParams) {
         this.region = region ?? ApiRegion.NorthAmerica;
         this.lwaClientId = clientId;
         this.clientSecret = clientSecret;
         this.awsAccessKey = awsAccessKey;
         this.awsSecret = awsSecret;
+        this.appRoleArn = appRoleArn;
+        this.sts = new STS({ role: appRoleArn, secret: awsSecret, accessKey: awsAccessKey });
 
         console.warn('**** this.region=', this.region);
         if (oauthCode && refreshToken) {
@@ -205,16 +205,15 @@ export default class SpApi {
         this.requestInterceptor = this.requestInterceptor.bind(this);
     }
     private async init(spec: any) {
-        [ this.swaggerClient, this.lwa ] = await Promise.all([ new SwaggerClient({ spec, requestInterceptor: this.requestInterceptor }), this.lwaPromise ]);
+        [ this.swaggerClient, this.lwa ] = await Promise.all([
+            new SwaggerClient({ spec, requestInterceptor: this.requestInterceptor }),
+            this.lwaPromise,
+            this.sts.ready(),
+        ]);
 
         this.isReady = true;
     }
     requestInterceptor = async (req: any) => { // req is a Request, but what the hell kind of Request? headers.append isn't there, and default Request headers is readonly.
-        // https://gist.github.com/davidkelley/c1274cffdc0d9d782d7e
-        function amzLongDate(date: Date) {
-            return date.toISOString().replace(/[:\-]|\.\d{3}/g, '').substr(0, 17);
-        }
-        const requestDate = new Date();
         const u = new URL(req.url);
         const opts = {
             service: 'execute-api',
@@ -223,52 +222,22 @@ export default class SpApi {
             headers: {
                 'x-amz-access-token': (await this.lwa!.getAccessToken()) as string,
                 'user-agent': 'sp-api-simple/0.1 (Language=JavaScript; Platform=Node)',
+                'x-amz-security-token': this.sts.roleTokens.securityToken,
             },
         };
 
-        const signedOpts = aws4.sign(opts, { secretAccessKey: this.awsSecret, accessKeyId: this.awsAccessKey });
-        // console.warn('* signedOpts=', signedOpts);
-        // https.request(signedOpts, res => res.pipe(process.stdout)).end();
+        const signedOpts = aws4.sign(opts, { secretAccessKey: this.sts.roleTokens.secret, accessKeyId: this.sts.roleTokens.id });
         return { ...req, ...signedOpts };
 
-/*         let opts = {
-            service: 'execute-api',
-            host: 'sellingpartnerapi-na.amazon.com',
-            path: '/authorization/v1/authorizationCode?sellingPartnerId=1&developerId=1&mwsAuthToken=1',
-            headers: {
-                'x-amz-access-token': (await this.lwa!.getAccessToken()) as string,
-                'user-agent': 'sp-api-simple/0.1 (Language=JavaScript; Platform=Node)',
-            },
-        };
-
-        aws4.sign(opts, { secretAccessKey: this.awsSecret, accessKeyId: this.awsAccessKey });
-
-        https.request(opts, res => res.pipe(process.stdout)).end()
- */
-        // await sleep(500000);
         return req;
-        // console.warn('* ret=', {...req, ...signedOpts});
-        // return { ...req, ...signedOpts };
-/*         req.headers = {
-            'x-amz-access-token': (await this.lwa!.getAccessToken()) as string,
-            'x-amz-date': amzLongDate(requestDate),
-            'user-agent': 'sp-api-simple/0.1 (Language=JavaScript; Platform=Node)',
-        }
-        console.warn('**** requestInterceptor', req);
-        const signedReq = aws4.sign({
-            ...req,
-            service: 'execute-api',
-            host: u.hostname,
-            path: u.pathname,
-        }, { secretAccessKey: this.clientSecret, accessKeyId: 'AKIAQJSLQX2LEXYO3CZC' });
-        console.warn('**** sign result', signedReq);
-        return signedReq;
- */        // return req;
     }
     private ready() {
         let readyInterval: any; // Timeout not working, don't feel like digging up how to fix right now
-        return new Promise((resolve, reject) => {
-            if (this.isReady) resolve(true);
+        return new Promise(async (resolve, reject) => {
+            if (this.isReady) {
+                await this.sts.ready();
+                return true;
+            }
             readyInterval = setInterval(() => {
                 if (this.isReady) {
                     clearInterval(readyInterval);
@@ -293,6 +262,37 @@ export default class SpApi {
         const x = await this.swaggerClient.apis.catalog.listCatalogItems({ MarketplaceId: 'TEST_CASE_200', SellerSKU: 'SKU_200' });
         console.warn('* x=', x);
     }
+    async getMarketplaceParticipations() {
+        await this.ready();
+        const res = await this.swaggerClient.apis.sellers.getMarketplaceParticipations(); // TODO: as Response from node-fetch?
+    /*
+    {
+      ok: true,
+      url: 'https://sandbox.sellingpartnerapi-na.amazon.com/sellers/v1/marketplaceParticipations',
+      status: 200,
+      statusText: 'OK',
+      headers: {
+        connection: 'close',
+        'content-length': '249',
+        'content-type': 'application/json',
+        date: [ 'Sun', '29 Nov 2020 09:51:49 GMT' ],
+        'x-amz-apigw-id': 'Ww5QSEvbIAMF9MQ=',
+        'x-amzn-requestid': '2d499534-7908-4279-a2e5-ce91e46c0dc1',
+        'x-amzn-trace-id': 'Root=1-5fc36f34-1262e6210174da7c2cd70ccc;Sampled=0'
+      },
+      text: '{"payload":[{"marketplace":{"id":"ATVPDKIKX0DER","countryCode":"US","name":"Amazon.com","defaultCurrencyCode":"USD","defaultLanguageCode":"en_US","domainName":"www.amazon.com"},"participation":{"isParticipating":true,"hasSuspendedListings":false}}]}',
+      data: '{"payload":[{"marketplace":{"id":"ATVPDKIKX0DER","countryCode":"US","name":"Amazon.com","defaultCurrencyCode":"USD","defaultLanguageCode":"en_US","domainName":"www.amazon.com"},"participation":{"isParticipating":true,"hasSuspendedListings":false}}]}',
+      body: { payload: [ [Object] ] },
+      obj: { payload: [ [Object] ] }
+    }
+    */
+        const mps = (res?.body?.payload ?? res.body) as apid.MarketplaceParticipationList;
+        return {
+            status: res.status,
+            headers: res.headers,
+            result: mps,
+        }
+    }
 }
 
 const test = new SpApi({
@@ -302,35 +302,8 @@ const test = new SpApi({
     refreshToken: testkeys.TEST_REFRESH_TOKEN,
     awsAccessKey: testkeys.AWS_ACCESS_KEY,
     awsSecret: testkeys.AWS_SECRET,
+    appRoleArn: AWS_ROLE_ARN,
 });
 console.warn('* SpApi created');
-
-const rolereq = signRoleCredentialsRequest({
-    role: AWS_ROLE_ARN,
-    secret: testkeys.AWS_SECRET,
-    id: testkeys.AWS_ACCESS_KEY,
-});
-
-console.warn('* rolereq=', rolereq);
-const x = await request(rolereq);
-console.warn('* x=', x);
-// returns
-/*
-    '<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">\n' +
-    '  <AssumeRoleResult>\n' +
-    '    <AssumedRoleUser>\n' +
-    '      <AssumedRoleId>AROAQJ...:SPAPISession</AssumedRoleId>\n' +
-    '      <Arn>arn:aws:sts::0...2:assumed-role/SellingPartnerRole/SPAPISession</Arn>\n' +
-    '    </AssumedRoleUser>\n' +
-    '    <Credentials>\n' +
-    '      <AccessKeyId>ASIA...7IG4</AccessKeyId>\n' +
-    '      <SecretAccessKey>4mk/fmuvy...Yk</SecretAccessKey>\n' +
-    '      <SessionToken>FwoGZXIvY...kcdJ7ffOikH19S6EB8=</SessionToken>\n' +
-    '      <Expiration>2020-11-29T09:18:35Z</Expiration>\n' +
-    '    </Credentials>\n' +
-    '  </AssumeRoleResult>\n' +
-    '  <ResponseMetadata>\n' +
-    '    <RequestId>ec384ee3-f116-43be-b27a-b637df8d6e69</RequestId>\n' +
-    '  </ResponseMetadata>\n' +
-    '</AssumeRoleResponse>\n',
-*/
+const res = await test.getMarketplaceParticipations();
+console.warn('* res=', JSON.stringify(res));
