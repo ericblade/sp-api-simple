@@ -1,8 +1,8 @@
 import SwaggerClient from 'swagger-client';
 import type { default as apid } from './api-types';
-import { TEST_REFRESH_TOKEN, LWA_CLIENT_ID, LWA_CLIENT_SECRET, AWS_ACCESS_KEY, AWS_SECRET } from './testkeys.js';
+import { TEST_REFRESH_TOKEN, LWA_CLIENT_ID, LWA_CLIENT_SECRET, AWS_ACCESS_KEY, AWS_SECRET, AWS_ROLE_ARN } from './testkeys.js';
 import aws4 from 'aws4';
-import https from 'https';
+import { signRoleCredentialsRequest, request } from './sts.js';
 import sleep from 'await-sleep';
 
 const testkeys = {
@@ -169,7 +169,7 @@ type ConstructorParams = {
 };
 
 export default class SpApi {
-    private swaggerClient: typeof SwaggerClient;
+    /* private */ swaggerClient: typeof SwaggerClient;
     private isReady = false;
     private lwaPromise: Promise<LWA>;
     private lwa: LWA | null = null;
@@ -206,6 +206,7 @@ export default class SpApi {
     }
     private async init(spec: any) {
         [ this.swaggerClient, this.lwa ] = await Promise.all([ new SwaggerClient({ spec, requestInterceptor: this.requestInterceptor }), this.lwaPromise ]);
+
         this.isReady = true;
     }
     requestInterceptor = async (req: any) => { // req is a Request, but what the hell kind of Request? headers.append isn't there, and default Request headers is readonly.
@@ -280,10 +281,22 @@ export default class SpApi {
         await this.ready();
         return this.swaggerClient.apis.authorization.getAuthorizationCode(params);
     }
+    async test() {
+        await this.ready();
+        // console.warn('* ', this.swaggerClient.apis.catalog);
+        // listCatalogItems, getCatalogItem, listCatalogCategories
+        // "MarketplaceId": {
+        // "value": "TEST_CASE_200"
+    // },
+    // "SellerSKU": {
+        // "value": "SKU_200"
+        const x = await this.swaggerClient.apis.catalog.listCatalogItems({ MarketplaceId: 'TEST_CASE_200', SellerSKU: 'SKU_200' });
+        console.warn('* x=', x);
+    }
 }
 
 const test = new SpApi({
-    region: ApiRegion.NorthAmerica,
+    region: ApiRegion.NorthAmericaSandbox,
     clientId: testkeys.LWA_CLIENT_ID,
     clientSecret: testkeys.LWA_CLIENT_SECRET,
     refreshToken: testkeys.TEST_REFRESH_TOKEN,
@@ -291,37 +304,33 @@ const test = new SpApi({
     awsSecret: testkeys.AWS_SECRET,
 });
 console.warn('* SpApi created');
-const x = await test.getAuthorizationCode({ developerId: '1', mwsAuthToken: '1', sellingPartnerId: '1' });
+
+const rolereq = signRoleCredentialsRequest({
+    role: AWS_ROLE_ARN,
+    secret: testkeys.AWS_SECRET,
+    id: testkeys.AWS_ACCESS_KEY,
+});
+
+console.warn('* rolereq=', rolereq);
+const x = await request(rolereq);
 console.warn('* x=', x);
-
-// const test = new SpApi({ region: ApiRegion.NorthAmericaSandbox });
-// const x = await test.getAuthorizationCode({developerId: '1',mwsAuthToken: '1',sellingPartnerId:'1'})
-/* const { apis: {
-    authorization,
-    catalog,
-    fbaInbound,
-    fbaInventory,
-    smallAndLight,
-    feeds,
-    default: financial, // this should be financial?!
-    fbaOutbound,
-    merchantFulfillment,
-    messaging,
-    notifications,
-    ordersV0,
-    fees,
-    productPricing,
-    reports,
-    sales,
-    service,
-    shipping,
-    solicitations,
-    uploads,
-} } = x;
-
-export function getAuthorizationCode(params: getAuthorizationCodeParams): apid.GetAuthorizationCodeResponse {
-    return authorization.getAuthorizationCode(params);
-}
-
-await getAuthorizationCode({developerId: 'testing',mwsAuthToken: 'testing',sellingPartnerId: 'testing' });
- */
+// returns
+/*
+    '<AssumeRoleResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">\n' +
+    '  <AssumeRoleResult>\n' +
+    '    <AssumedRoleUser>\n' +
+    '      <AssumedRoleId>AROAQJ...:SPAPISession</AssumedRoleId>\n' +
+    '      <Arn>arn:aws:sts::0...2:assumed-role/SellingPartnerRole/SPAPISession</Arn>\n' +
+    '    </AssumedRoleUser>\n' +
+    '    <Credentials>\n' +
+    '      <AccessKeyId>ASIA...7IG4</AccessKeyId>\n' +
+    '      <SecretAccessKey>4mk/fmuvy...Yk</SecretAccessKey>\n' +
+    '      <SessionToken>FwoGZXIvY...kcdJ7ffOikH19S6EB8=</SessionToken>\n' +
+    '      <Expiration>2020-11-29T09:18:35Z</Expiration>\n' +
+    '    </Credentials>\n' +
+    '  </AssumeRoleResult>\n' +
+    '  <ResponseMetadata>\n' +
+    '    <RequestId>ec384ee3-f116-43be-b27a-b637df8d6e69</RequestId>\n' +
+    '  </ResponseMetadata>\n' +
+    '</AssumeRoleResponse>\n',
+*/
