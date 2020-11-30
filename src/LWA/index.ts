@@ -2,6 +2,12 @@ import SwaggerClient from 'swagger-client';
 
 const OAUTH_URL = 'https://api.amazon.com/auth/o2/token';
 
+type LWATokens = {
+    access_token: string,
+    refresh_token: string,
+    expires_at: number,
+};
+
 export class LWA {
     private access_token: string;
     private refresh_token: string;
@@ -84,10 +90,5 @@ export class LWA {
         return this.access_token;
     }
 }
-type LWATokens = {
-    access_token: string,
-    refresh_token: string,
-    expires_at: number,
-};
 
 export default LWA;

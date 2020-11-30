@@ -76,23 +76,10 @@ export default class SpApi {
     private lwaPromise: Promise<LWA>;
     private lwa: LWA | null = null;
     private sts: STS;
-    private region: ApiRegion;
-    private lwaClientId: string;
-    private clientSecret: string;
-    private awsAccessKey: string;
-    private awsSecret: string;
-    private appRoleArn: string;
 
     constructor({ region, clientId, clientSecret, oauthCode, refreshToken, awsAccessKey, awsSecret, appRoleArn }: ConstructorParams) {
-        this.region = region ?? ApiRegion.NorthAmerica;
-        this.lwaClientId = clientId;
-        this.clientSecret = clientSecret;
-        this.awsAccessKey = awsAccessKey;
-        this.awsSecret = awsSecret;
-        this.appRoleArn = appRoleArn;
-        this.sts = new STS({ role: appRoleArn, secret: awsSecret, accessKey: awsAccessKey });
+        const thisRegion = region ?? ApiRegion.NorthAmerica;
 
-        console.warn('**** this.region=', this.region);
         if (oauthCode && refreshToken) {
             throw new Error('cannot provide both oauthCode and refreshToken');
         }
@@ -104,12 +91,15 @@ export default class SpApi {
         } else {
             this.lwaPromise = LWA.fromRefreshToken(refreshToken as string, clientId, clientSecret);
         }
-        const { endpoint } = RegionServers[this.region];
+        this.sts = new STS({ role: appRoleArn, secret: awsSecret, accessKey: awsAccessKey });
+
+        const { endpoint } = RegionServers[thisRegion];
         const thisSpec: any = { ...spec };
         thisSpec.host = endpoint;
         this.init(thisSpec);
         this.requestInterceptor = this.requestInterceptor.bind(this);
     }
+
     private async init(spec: any) {
         [ this.swaggerClient, this.lwa ] = await Promise.all([
             new SwaggerClient({ spec, requestInterceptor: this.requestInterceptor }),
@@ -119,6 +109,7 @@ export default class SpApi {
 
         this.isReady = true;
     }
+
     requestInterceptor = async (req: any) => { // req is a Request, but what the hell kind of Request? headers.append isn't there, and default Request headers is readonly.
         const u = new URL(req.url);
         const opts = {
@@ -134,9 +125,8 @@ export default class SpApi {
 
         const signedOpts = aws4.sign(opts, { secretAccessKey: this.sts.roleTokens.secret, accessKeyId: this.sts.roleTokens.id });
         return { ...req, ...signedOpts };
-
-        return req;
     }
+
     private ready() {
         let readyInterval: any; // Timeout not working, don't feel like digging up how to fix right now
         return new Promise(async (resolve, reject) => {
@@ -152,10 +142,12 @@ export default class SpApi {
             }, 10);
         });
     }
+
     async getAuthorizationCode(params: getAuthorizationCodeParams): Promise<apid.GetAuthorizationCodeResponse> {
         await this.ready();
         return this.swaggerClient.apis.authorization.getAuthorizationCode(params);
     }
+
     async test() {
         await this.ready();
         // console.warn('* ', this.swaggerClient.apis.catalog);
@@ -168,6 +160,7 @@ export default class SpApi {
         const x = await this.swaggerClient.apis.catalog.listCatalogItems({ MarketplaceId: 'TEST_CASE_200', SellerSKU: 'SKU_200' });
         console.warn('* x=', x);
     }
+
     async getMarketplaceParticipations() {
         await this.ready();
         const res = await this.swaggerClient.apis.sellers.getMarketplaceParticipations(); // TODO: as Response from node-fetch?
