@@ -7,7 +7,8 @@
     "test": "nyc ./node_modules/.bin/_mocha 'test/**/*.test.ts'",
     "build:apitypes": "npx rimraf selling-partner-api-models && git clone --depth 1 https://github.com/amzn/selling-partner-api-models.git && npx dtsgenerator --out ./src/api-types.d.ts selling-partner-api-models/models/**/*.json && npx rimraf selling-partner-api-models && echo export default Definitions; >> ./src/api-types.d.ts",
     "build:swagger": "tsc && node ./build/build-swagger",
-    "start": "tsc && node --experimental-json-modules ."
+    "build:all": "npm run build:apitypes && npm run build:swagger && tsc",
+    "build": "tsc"
   },
   "author": "",
   "license": "ISC",

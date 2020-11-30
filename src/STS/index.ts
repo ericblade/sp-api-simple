@@ -228,3 +228,5 @@ export class STS {
         });
     }
 }
+
+export default STS;
