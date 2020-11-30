@@ -1,20 +1,13 @@
 import SwaggerClient from 'swagger-client';
 import type { default as apid } from './api-types';
-import { TEST_REFRESH_TOKEN, LWA_CLIENT_ID, LWA_CLIENT_SECRET, AWS_ACCESS_KEY, AWS_SECRET, AWS_ROLE_ARN } from './testkeys.js';
 import aws4 from 'aws4';
-import { STS } from './sts.js';
-import sleep from 'await-sleep';
-
-const testkeys = {
-    TEST_REFRESH_TOKEN,
-    LWA_CLIENT_ID,
-    LWA_CLIENT_SECRET,
-    AWS_ACCESS_KEY,
-    AWS_SECRET,
-};
+import { STS } from './sts';
 
 /* @ts-ignore */ // ignore the next line so that the code that builds the import file can be compiled
-const spec = (await import('./sp-api-swagger.json')).default;
+const spec = (async function() {
+    return (await import('./sp-api-swagger.json')).default;
+});
+// const spec = (await import('./sp-api-swagger.json')).default;
 
 export enum ApiRegion {
     NorthAmerica = 'na',
@@ -68,14 +61,14 @@ export class LWA {
     private clientId: string;
     private clientSecret: string;
 
-    private constructor({ access_token, refresh_token, expires_at }: LWATokens, clientId: string = testkeys.LWA_CLIENT_ID, clientSecret: string = testkeys.LWA_CLIENT_SECRET) {
+    private constructor({ access_token, refresh_token, expires_at }: LWATokens, clientId: string, clientSecret: string) {
         this.access_token = access_token;
         this.refresh_token = refresh_token;
         this.expires_at = expires_at;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
     }
-    static async fromOauthCode(code: string, clientId: string = testkeys.LWA_CLIENT_ID, clientSecret: string = testkeys.LWA_CLIENT_SECRET) {
+    static async fromOauthCode(code: string, clientId: string, clientSecret: string) {
         const params = {
             grant_type: 'authorization_code',
             code,
@@ -100,7 +93,7 @@ export class LWA {
         };
         return new LWA(t, clientId, clientSecret);
     }
-    static async fromRefreshToken(refreshToken: string, clientId: string = testkeys.LWA_CLIENT_ID, clientSecret: string = testkeys.LWA_CLIENT_SECRET) {
+    static async fromRefreshToken(refreshToken: string, clientId: string, clientSecret: string) {
         const params = {
             grant_type: 'refresh_token',
             refresh_token: refreshToken,
@@ -199,7 +192,7 @@ export default class SpApi {
             this.lwaPromise = LWA.fromRefreshToken(refreshToken as string, clientId, clientSecret);
         }
         const { endpoint } = RegionServers[this.region];
-        const thisSpec = { ...spec };
+        const thisSpec: any = { ...spec };
         thisSpec.host = endpoint;
         this.init(thisSpec);
         this.requestInterceptor = this.requestInterceptor.bind(this);
@@ -294,16 +287,3 @@ export default class SpApi {
         }
     }
 }
-
-const test = new SpApi({
-    region: ApiRegion.NorthAmericaSandbox,
-    clientId: testkeys.LWA_CLIENT_ID,
-    clientSecret: testkeys.LWA_CLIENT_SECRET,
-    refreshToken: testkeys.TEST_REFRESH_TOKEN,
-    awsAccessKey: testkeys.AWS_ACCESS_KEY,
-    awsSecret: testkeys.AWS_SECRET,
-    appRoleArn: AWS_ROLE_ARN,
-});
-console.warn('* SpApi created');
-const res = await test.getMarketplaceParticipations();
-console.warn('* res=', JSON.stringify(res));

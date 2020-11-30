@@ -9,7 +9,7 @@
     "extension": [
         ".ts"
     ],
-    "report": [
+    "reporter": [
         "text-summary",
         "html"
     ],

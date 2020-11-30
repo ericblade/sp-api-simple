@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "",
   "main": "build/index.js",
-  "type": "module",
   "scripts": {
     "test": "nyc ./node_modules/.bin/_mocha 'test/**/*.test.ts'",
     "build:apitypes": "npx rimraf selling-partner-api-models && git clone --depth 1 https://github.com/amzn/selling-partner-api-models.git && npx dtsgenerator --out ./src/api-types.d.ts selling-partner-api-models/models/**/*.json && npx rimraf selling-partner-api-models && echo export default Definitions; >> ./src/api-types.d.ts",
@@ -13,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@istanbuljs/nyc-config-typescript": "^1.0.1",
     "@testdeck/mocha": "^0.1.2",
     "@types/aws4": "^1.5.1",
     "@types/mocha": "^8.0.4",

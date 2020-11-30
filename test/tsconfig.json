@@ -1,16 +1,18 @@
 {
+    "ts-node": {
+        "compilerOptions": {
+            "target": "es6",
+            "module": "CommonJS"
+        }
+    },
     "extends": "../tsconfig.json",
     "compilerOptions": {
         "baseUrl": "./",
-        "module": "CommonJS",
         "experimentalDecorators": true,
         "strictPropertyInitialization": false,
         "isolatedModules": false,
         "strict": false,
-        "noImplicitAny": false,
-        "typeRoots": [
-            "../node_modules/@types"
-        ]
+        "noImplicitAny": false
     },
     "exclude": [
         "../node_modules"
