@@ -1,0 +1,4 @@
+{
+    "require": "./register.cjs",
+    "report": "dot"
+}
