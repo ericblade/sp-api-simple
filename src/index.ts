@@ -169,14 +169,15 @@ export default class SpApi {
         return new Promise(async (resolve, reject) => {
             if (this.isReady) {
                 await this.sts.ready();
-                return true;
+                resolve(true);
+            } else {
+                readyInterval = setInterval(() => {
+                    if (this.isReady) {
+                        clearInterval(readyInterval);
+                        resolve(true);
+                    }
+                }, 10);
             }
-            readyInterval = setInterval(() => {
-                if (this.isReady) {
-                    clearInterval(readyInterval);
-                    resolve(true);
-                }
-            }, 10);
         });
     }
 
