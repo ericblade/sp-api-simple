@@ -1,3 +1,7 @@
+// TODO: This file is rather largely borrowed from https://github.com/amz-tools/amazon-sp-api/blob/ef67c2f6550ab3feec6a2710c664075f71f25e88/lib/Signer.js#L134
+// TODO: There shouldn't be a need to do this, just need to understand how to properly make this same call using the
+// TODO: already onboard SwaggerClient.http and mws4 and other libs, rather than rolling a whole new setup as this file currently does.
+
 import crypto from 'crypto-js';
 import qs from 'querystring';
 import https from 'https';
@@ -82,7 +86,7 @@ function _constructSignature(region: string, action_type: string, string_to_sign
     signature = crypto.HmacSHA256('aws4_request', signature);
     return crypto.HmacSHA256(string_to_sign, signature).toString(crypto.enc.Hex);
 }
-// https://github.com/amz-tools/amazon-sp-api/blob/ef67c2f6550ab3feec6a2710c664075f71f25e88/lib/Signer.js#L134
+
 function signRoleCredentialsRequest(aws_user: { role: string, secret: string, id: string }){
     let query = {
         Action: 'AssumeRole' as const,

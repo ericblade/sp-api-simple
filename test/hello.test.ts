@@ -3,7 +3,7 @@ import { TEST_REFRESH_TOKEN, LWA_CLIENT_ID, LWA_CLIENT_SECRET, AWS_ACCESS_KEY, A
 import lib, { ApiRegion } from '../src/index';
 
 describe('Testing', () => {
-    it('Tests!', () => {
+    it('Tests!', async () => {
         const x = new lib({
             appRoleArn: AWS_ROLE_ARN,
             awsAccessKey: AWS_ACCESS_KEY,
@@ -13,6 +13,8 @@ describe('Testing', () => {
             refreshToken:TEST_REFRESH_TOKEN,
             region:ApiRegion.NorthAmericaSandbox,
         });
+        const y = await x.getMarketplaceParticipations();
+        console.warn('* y=', y);
         return true;
     });
 });
