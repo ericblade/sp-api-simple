@@ -2,9 +2,12 @@ import { Object as TSO } from 'ts-toolbelt';
 import type { default as apid } from './api-types';
 import SwaggerClient from 'swagger-client';
 import aws4 from 'aws4';
+// import AJV from 'ajv';
 
 import STS from './STS';
 import LWA from './LWA';
+
+// const ajv = new AJV({ removeAdditional: true });
 
 // load the json spec file. It is done this way, rather than as a direct .json import, because this
 // works with top-level await enabled, and i do have some sort of hope of getting this library to
@@ -16,8 +19,11 @@ import LWA from './LWA';
 
 /* @ts-ignore */ // ignore the next line so that the code that builds the import file can be compiled
 const spec = (async function() {
-    return (await import('./sp-api-swagger.json')).default;
+    const spec = (await import('./sp-api-swagger.json')).default;
+    // ajv.addSchema(spec, 'spec');
+    return spec;
 })();
+
 // const spec = (await import('./sp-api-swagger.json')).default;
 
 // Possible API regions, you can pass one to the SpApi constructor.
@@ -203,8 +209,14 @@ export default class SpApi {
     }
 
     async getMarketplaceParticipations() {
+        // console.warn('* getMarketplaceParticipations');
         await this.ready();
+        // console.warn('* ready');
         const res = await this.swaggerClient.apis.sellers.getMarketplaceParticipations(); // TODO: as Response from node-fetch?
+        // console.warn('* res=', res);
+        // console.warn('* payload=', res.body.payload);
+        // const isValid = ajv.validate({ $ref: 'spec#/definitions/MarketplaceParticipationList' }, res.body.payload);
+        // console.warn('***** isValid: ', isValid);
     /*
     {
       ok: true,

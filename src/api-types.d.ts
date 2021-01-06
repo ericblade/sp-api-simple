@@ -324,9 +324,9 @@ declare namespace Definitions {
      */
     export type AffordabilityExpenseEventList = /* An expense related to an affordability promotion. */ AffordabilityExpenseEvent[];
     /**
-     * An Amazon-defined order identifier, in 3-7-7 format.
+     * An Amazon-defined order identifier, in 3-7-7 format. <br>**Pattern** : `[0-9A-Z]{3}-[0-9]{7}-[0-9]{7}`.
      */
-    export type AmazonOrderId = string; // [0-9A-Z]{3}-[0-9]{7}-[0-9]{7}
+    export type AmazonOrderId = string;
     /**
      * The fees for Amazon to prep goods for shipment.
      */
@@ -1581,7 +1581,7 @@ declare namespace Definitions {
      */
     export interface CreateAmazonMotorsRequest {
         /**
-         * Attachments to include in the message to the buyer.
+         * Attachments to include in the message to the buyer. If any text is included in the attachment, the text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         attachments?: /* Represents a file uploaded to a destination that was created by the createUploadDestination operation of the Uploads API. */ Attachment[];
     }
@@ -1596,7 +1596,7 @@ declare namespace Definitions {
      */
     export interface CreateConfirmCustomizationDetailsRequest {
         /**
-         * The text to be sent to the buyer. Only links related to customization details are allowed. Do not include HTML or email addresses.
+         * The text to be sent to the buyer. Only links related to customization details are allowed. Do not include HTML or email addresses. The text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         text?: string;
         /**
@@ -1615,7 +1615,7 @@ declare namespace Definitions {
      */
     export interface CreateConfirmDeliveryDetailsRequest {
         /**
-         * The text to be sent to the buyer. Only links related to order delivery are allowed. Do not include HTML or email addresses.
+         * The text to be sent to the buyer. Only links related to order delivery are allowed. Do not include HTML or email addresses. The text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         text?: string;
     }
@@ -1630,7 +1630,7 @@ declare namespace Definitions {
      */
     export interface CreateConfirmOrderDetailsRequest {
         /**
-         * The text to be sent to the buyer. Only links related to order completion are allowed. Do not include HTML or email addresses.
+         * The text to be sent to the buyer. Only links related to order completion are allowed. Do not include HTML or email addresses. The text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         text?: string;
     }
@@ -1645,7 +1645,7 @@ declare namespace Definitions {
      */
     export interface CreateConfirmServiceDetailsRequest {
         /**
-         * The text to be sent to the buyer. Only links related to Home Service calls are allowed. Do not include HTML or email addresses.
+         * The text to be sent to the buyer. Only links related to Home Service calls are allowed. Do not include HTML or email addresses. The text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         text?: string;
     }
@@ -1686,7 +1686,7 @@ declare namespace Definitions {
      */
     export interface CreateDigitalAccessKeyRequest {
         /**
-         * The text to be sent to the buyer. Only links related to the digital access key are allowed. Do not include HTML or email addresses.
+         * The text to be sent to the buyer. Only links related to the digital access key are allowed. Do not include HTML or email addresses. The text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         text?: string;
         /**
@@ -1942,7 +1942,7 @@ declare namespace Definitions {
      */
     export interface CreateLegalDisclosureRequest {
         /**
-         * Attachments to include in the message to the buyer.
+         * Attachments to include in the message to the buyer. If any text is included in the attachment, the text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         attachments?: /* Represents a file uploaded to a destination that was created by the createUploadDestination operation of the Uploads API. */ Attachment[];
     }
@@ -2137,7 +2137,7 @@ declare namespace Definitions {
      */
     export interface CreateUnexpectedProblemRequest {
         /**
-         * The text to be sent to the buyer. Only links related to unexpected problem calls are allowed. Do not include HTML or email addresses.
+         * The text to be sent to the buyer. Only links related to unexpected problem calls are allowed. Do not include HTML or email addresses. The text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         text?: string;
     }
@@ -2159,7 +2159,7 @@ declare namespace Definitions {
      */
     export interface CreateWarrantyRequest {
         /**
-         * Attachments to include in the message to the buyer.
+         * Attachments to include in the message to the buyer. If any text is included in the attachment, the text must be written in the buyer's language of preference, which can be retrieved from the GetAttributes operation.
          */
         attachments?: /* Represents a file uploaded to a destination that was created by the createUploadDestination operation of the Uploads API. */ Attachment[];
         /**
@@ -3427,7 +3427,7 @@ declare namespace Definitions {
         /**
          * An Amazon defined order identifier
          */
-        OrderId: /* An Amazon-defined order identifier, in 3-7-7 format. */ AmazonOrderId /* [0-9A-Z]{3}-[0-9]{7}-[0-9]{7} */;
+        OrderId: /* An Amazon-defined order identifier, in 3-7-7 format. <br>**Pattern** : `[0-9A-Z]{3}-[0-9]{7}-[0-9]{7}`. */ AmazonOrderId;
     }
     /**
      * Response schema.
@@ -7964,7 +7964,7 @@ declare namespace Definitions {
      */
     export interface Shipment {
         ShipmentId: /* An Amazon-defined shipment identifier. */ ShipmentId;
-        AmazonOrderId: /* An Amazon-defined order identifier, in 3-7-7 format. */ AmazonOrderId /* [0-9A-Z]{3}-[0-9]{7}-[0-9]{7} */;
+        AmazonOrderId: /* An Amazon-defined order identifier, in 3-7-7 format. <br>**Pattern** : `[0-9A-Z]{3}-[0-9]{7}-[0-9]{7}`. */ AmazonOrderId;
         SellerOrderId?: /* A seller-defined order identifier. */ SellerOrderId;
         ItemList: /* A list of items. */ ItemList;
         /**
@@ -8130,7 +8130,7 @@ declare namespace Definitions {
         /**
          * An Amazon-defined order identifier in 3-7-7 format.
          */
-        AmazonOrderId: /* An Amazon-defined order identifier, in 3-7-7 format. */ AmazonOrderId /* [0-9A-Z]{3}-[0-9]{7}-[0-9]{7} */;
+        AmazonOrderId: /* An Amazon-defined order identifier, in 3-7-7 format. <br>**Pattern** : `[0-9A-Z]{3}-[0-9]{7}-[0-9]{7}`. */ AmazonOrderId;
         /**
          * A seller-defined order identifier.
          */
@@ -9078,13 +9078,7 @@ declare namespace Paths {
     }
     namespace CancelShipment {
         namespace Responses {
-            /**
-             * Response schema.
-             */
             export type $200 = /* Response schema. */ Definitions.CancelShipmentResponse;
-            /**
-             * Response schema.
-             */
             export type $400 = /* Response schema. */ Definitions.CancelShipmentResponse;
             export type $401 = /* Response schema. */ Definitions.CancelShipmentResponse;
             export type $403 = /* Response schema. */ Definitions.CancelShipmentResponse;
@@ -9096,13 +9090,7 @@ declare namespace Paths {
     }
     namespace CancelShipmentOld {
         namespace Responses {
-            /**
-             * Response schema.
-             */
             export type $200 = /* Response schema. */ Definitions.CancelShipmentResponse;
-            /**
-             * Response schema.
-             */
             export type $400 = /* Response schema. */ Definitions.CancelShipmentResponse;
             export type $401 = /* Response schema. */ Definitions.CancelShipmentResponse;
             export type $403 = /* Response schema. */ Definitions.CancelShipmentResponse;
@@ -9485,9 +9473,6 @@ declare namespace Paths {
             export type Body = /* Request schema. */ Definitions.CreateShipmentRequest;
         }
         namespace Responses {
-            /**
-             * Response schema.
-             */
             export type $200 = /* Response schema. */ Definitions.CreateShipmentResponse;
             export type $400 = /* Response schema. */ Definitions.CreateShipmentResponse;
             export type $401 = /* Response schema. */ Definitions.CreateShipmentResponse;
@@ -9641,13 +9626,7 @@ declare namespace Paths {
             export type Body = /* Request schema. */ Definitions.GetAdditionalSellerInputsRequest;
         }
         namespace Responses {
-            /**
-             * Response schema.
-             */
             export type $200 = /* Response schema. */ Definitions.GetAdditionalSellerInputsResponse;
-            /**
-             * Response schema.
-             */
             export type $400 = /* Response schema. */ Definitions.GetAdditionalSellerInputsResponse;
             export type $401 = /* Response schema. */ Definitions.GetAdditionalSellerInputsResponse;
             export type $403 = /* Response schema. */ Definitions.GetAdditionalSellerInputsResponse;
@@ -9665,13 +9644,7 @@ declare namespace Paths {
             export type Body = /* Request schema. */ Definitions.GetAdditionalSellerInputsRequest;
         }
         namespace Responses {
-            /**
-             * Response schema.
-             */
             export type $200 = /* Response schema. */ Definitions.GetAdditionalSellerInputsResponse;
-            /**
-             * Response schema.
-             */
             export type $400 = /* Response schema. */ Definitions.GetAdditionalSellerInputsResponse;
             export type $401 = /* Response schema. */ Definitions.GetAdditionalSellerInputsResponse;
             export type $403 = /* Response schema. */ Definitions.GetAdditionalSellerInputsResponse;
@@ -9782,13 +9755,7 @@ declare namespace Paths {
             export type Body = /* Request schema. */ Definitions.GetEligibleShipmentServicesRequest;
         }
         namespace Responses {
-            /**
-             * Response schema.
-             */
             export type $200 = /* Response schema. */ Definitions.GetEligibleShipmentServicesResponse;
-            /**
-             * Response schema.
-             */
             export type $400 = /* Response schema. */ Definitions.GetEligibleShipmentServicesResponse;
             export type $401 = /* Response schema. */ Definitions.GetEligibleShipmentServicesResponse;
             export type $403 = /* Response schema. */ Definitions.GetEligibleShipmentServicesResponse;
@@ -9809,13 +9776,7 @@ declare namespace Paths {
             export type Body = /* Request schema. */ Definitions.GetEligibleShipmentServicesRequest;
         }
         namespace Responses {
-            /**
-             * Response schema.
-             */
             export type $200 = /* Response schema. */ Definitions.GetEligibleShipmentServicesResponse;
-            /**
-             * Response schema.
-             */
             export type $400 = /* Response schema. */ Definitions.GetEligibleShipmentServicesResponse;
             export type $401 = /* Response schema. */ Definitions.GetEligibleShipmentServicesResponse;
             export type $403 = /* Response schema. */ Definitions.GetEligibleShipmentServicesResponse;
@@ -10378,9 +10339,6 @@ declare namespace Paths {
     }
     namespace GetShipment {
         namespace Responses {
-            /**
-             * Response schema.
-             */
             export type $200 = /* Response schema. */ Definitions.GetShipmentResponse;
             export type $400 = /* Response schema. */ Definitions.GetShipmentResponse;
             export type $401 = /* Response schema. */ Definitions.GetShipmentResponse;
@@ -10949,4 +10907,4 @@ declare namespace Paths {
         }
     }
 }
-export default Definitions;
+export default Definitions 
